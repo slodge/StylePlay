@@ -1,0 +1,32 @@
+﻿<Properties>
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug|iPhoneSimulator" PreferredExecutionTarget="MonoDevelop.IPhone.IPhoneSimulatorTarget.IPhone.6.1" />
+  <MonoDevelop.Ide.Workbench ActiveDocument="StylePlay/StylePlayViewController.cs">
+    <Files>
+      <File FileName="StylePlay/AppDelegate.cs" Line="1" Column="1" />
+      <File FileName="StylePlay/StylePlayViewController.cs" Line="331" Column="57" />
+      <File FileName="StylePlay/StylePlayViewController.designer.cs" Line="15" Column="39" />
+    </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State expanded="True">
+          <Node name="StylePlay" expanded="True" selected="True">
+            <Node name="StylePlayViewController.cs" expanded="True" />
+          </Node>
+        </State>
+      </Pad>
+      <Pad Id="ClassPad">
+        <State expanded="True" selected="True" />
+      </Pad>
+      <Pad Id="MonoDevelop.Debugger.WatchPad">
+        <State />
+      </Pad>
+      <Pad Id="ConnectionManagerPad">
+        <State selected="True" />
+      </Pad>
+    </Pads>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+</Properties>
