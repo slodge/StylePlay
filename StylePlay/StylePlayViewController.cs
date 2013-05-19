@@ -2,12 +2,36 @@ using System;
 using System.Drawing;
 
 using System.Linq;
-using MonoTouch.Foundation;
 using MonoTouch.UIKit;
 using System.Collections.Generic;
 
 namespace StylePlay
 {
+	public static class StyleFinderHelper
+	{
+		public static StyleClassList CurrentList { get; set;}
+		public static IEnumerable<string> StyleClassListFor(UIView target)
+		{
+			if (CurrentList == null)
+				return null;
+
+			return CurrentList.ClassesFor(target);
+			/*
+			var view = target as UIView;
+			while (view != null)
+			{
+				var candidate = view as IStyleListContainer;
+				if (candidate != null)
+					return candidate.StyleClassList.ClassesFor(view);
+				
+				view = view.Superview;
+			}
+			
+			return new string[0];
+			*/
+		}
+	}
+
 	public class StyleRuleSet
 	{
 		public List<Rule> Rules { get; private set; }
@@ -17,13 +41,11 @@ namespace StylePlay
 			Rules = new List<Rule>();
 		}
 
-		public IEnumerable<IStyle> StylesFor(object target, StyleClassList styleClassList)
+		public IEnumerable<IStyle> StylesFor(object target)
 		{
-			var styles = styleClassList.ClassesFor(target);
-
 			var matchingRules = 
 				from rule in Rules
-					where rule.Matches(target, styles)
+					where rule.Matches(target)
 					select rule;
 
 			var toApply = new Dictionary<string, IStyle>();
@@ -42,9 +64,9 @@ namespace StylePlay
 		public List<ISelector> Selectors { get; private set; }
 		public List<IStyle> Styles { get; private set; }
 
-		public bool Matches(object target, IEnumerable<string> styleClasses)
+		public bool Matches(object target)
 		{
-			return Selectors.Any(x => x.Matches(target, styleClasses));
+			return Selectors.Any(x => x.Matches(target));
 		}
 
 		public Rule ()
@@ -58,17 +80,17 @@ namespace StylePlay
 
 	public interface ISelector
 	{
-		bool Matches(object target, IEnumerable<string> styleClasses);
+		bool Matches(object target);
 	}
 
 	// need to have parent -> child relationships here... maybe more imporant than doing list...
 	public class Selector : ISelector
 	{
-		public bool Matches(object target, IEnumerable<string> styleClasses)
+		public bool Matches(object target)
 		{
 			return
 				TypeMatches(target)
-					&& ClassMatches(styleClasses)
+					&& ClassMatches(target)
 					&& ParentSelectorMatches(target);
 		}
 
@@ -83,10 +105,12 @@ namespace StylePlay
 			return false;
 		}
 
-		private bool ClassMatches(IEnumerable<string> styleClasses)
+		private bool ClassMatches(object target)
 		{
 			if (string.IsNullOrEmpty(ClassName))
 				return true;
+
+			var styleClasses = StyleFinderHelper.StyleClassListFor((UIView)target);
 
 			if (styleClasses == null)
 				return false;
@@ -100,6 +124,23 @@ namespace StylePlay
 				return true;
 
 			// TODO - trawl through the superviews...
+			var uiView = target as UIView;
+			if (uiView == null)
+				return false;
+
+			uiView = uiView.Superview;
+			while (uiView != null)
+			{
+				if (ParentSelector.Matches(uiView))
+				{
+					return true;
+				}
+
+			    uiView = uiView.Superview;
+            }
+
+			// 			var styles = StyleFinderHelper.StyleClassListFor((UIView)target);
+			//uiView.Superview;
 			return false;
 		}
 
@@ -216,6 +257,14 @@ namespace StylePlay
 			{
 				((UIView)item).BackgroundColor = (UIColor)value;
 			};
+			_appliers[new Key(typeof(UIView), "BorderColor")] = (item, value) =>
+			{
+				((UIView)item).Layer.BorderColor = ((UIColor)value).CGColor;
+			};
+			_appliers[new Key(typeof(UIView), "BorderWidth")] = (item, value) =>
+			{
+				((UIView)item).Layer.BorderWidth = (float)value;
+			};
 			_appliers[new Key(typeof(UIView), "ShadowColor")] = (item, value) =>
 			{
 				((UIView)item).Layer.ShadowColor = ((UIColor)value).CGColor;
@@ -241,7 +290,28 @@ namespace StylePlay
 				// TODO - other UIControlState's
 				((UIButton)item).SetTitleColor((UIColor)value, UIControlState.Normal);
 			};
+			_appliers[new Key(typeof(UILabel), "Font")] = (item, value) =>
+			{
+				var fontDesc = (FontDescription)value;
+				((UILabel)item).Font = UIFont.FromName(fontDesc.FontName, fontDesc.FontSize);
+			};
+			_appliers[new Key(typeof(UIButton), "Font")] = (item, value) =>
+			{
+				var fontDesc = (FontDescription)value;
+				((UIButton)item).Font = UIFont.FromName(fontDesc.FontName, fontDesc.FontSize);
+			};
+			_appliers[new Key(typeof(UITextField), "Font")] = (item, value) =>
+			{
+				var fontDesc = (FontDescription)value;
+				((UITextField)item).Font = UIFont.FromName(fontDesc.FontName, fontDesc.FontSize);
+			};
 		}
+	}
+
+	public class FontDescription
+	{
+		public string FontName {get;set;}
+		public float FontSize {get;set;}
 	}
 
 	// consider selected rules in a different way - don't try changing the contents when selected!
@@ -288,21 +358,33 @@ namespace StylePlay
 		}
 	}
 
-	public partial class StylePlayViewController : UIViewController
+	public interface IStyleListContainer
+	{
+		StyleClassList StyleClassList { get; }
+	}
+
+	public partial class StylePlayViewController 
+		: UIViewController
+		, IStyleListContainer
 	{
 		public StylePlayViewController () : base ("StylePlayViewController", null)
 		{
 		}
 
-		void Apply (StyleRuleSet ruleset, StyleApplier applier, StyleClassList styleClassList, UIView parentView)
+		public StyleClassList StyleClassList
 		{
-			var styles = ruleset.StylesFor (parentView, styleClassList);
+			get; set;
+		}
+
+		void Apply (StyleRuleSet ruleset, StyleApplier applier, UIView parentView)
+		{
+			var styles = ruleset.StylesFor (parentView);
 			foreach (var style in styles) {
 				applier.Apply (parentView, style);
 			}
 
 			foreach (var view in parentView.Subviews) {
-				Apply (ruleset, applier, styleClassList, view);
+				Apply (ruleset, applier, view);
 			}
 		}
 		
@@ -328,7 +410,15 @@ namespace StylePlay
 			rule.Styles.Add(new SimpleStyle("ShadowOffset", new SizeF(4, 10)));
 			rule.Styles.Add(new SimpleStyle("ShadowRadius", 7f));
 			rule.Styles.Add(new SimpleStyle("ShadowColor", UIColor.Black));
-			rule.Styles.Add(new SimpleStyle("ShadowOpacity", 0.5f));
+			rule.Styles.Add(new SimpleStyle("ShadowOpacity", 0.9f));
+			rule.Styles.Add(new SimpleStyle("BorderColor", UIColor.Magenta));
+			rule.Styles.Add(new SimpleStyle("BorderWidth", 3.0f));
+			rule.Styles.Add(new SimpleStyle("Font", new FontDescription()
+			                                {
+				FontName = "Chalkduster",
+				FontSize = 24f
+			}));
+
 			//
 			ruleset.Rules.Add(rule);
 
@@ -336,15 +426,28 @@ namespace StylePlay
 			rule.Selectors.Add(new Selector(typeof(UILabel), "Foo"));
 			rule.Styles.Add(new SimpleStyle("Color", UIColor.Magenta));
 			rule.Styles.Add(new SimpleStyle("CornerRadius", 0f));
+			rule.Styles.Add(new SimpleStyle("Font", new FontDescription()
+			                                {
+				FontName = "Baskerville-BoldItalic",
+				FontSize = 24f
+			}));
+			ruleset.Rules.Add(rule);
+
+
+			rule = new Rule();
+			var parentSelector = new Selector(typeof(UIButton));
+			rule.Selectors.Add(new Selector(typeof(UILabel), null, parentSelector));
+			rule.Styles.Add(new SimpleStyle("BackgroundColor", UIColor.Black));
 			ruleset.Rules.Add(rule);
 
 			// would be nice to find another way to store these class hooks
 			// could just about use Tag fields - but that's unpleasant :/
-			var styleClassList = new StyleClassList();
-			styleClassList.AddClass(SpecialLabel, "Foo");
+			StyleClassList = new StyleClassList();
+			StyleClassList.AddClass(SpecialLabel, "Foo");
 
+			StyleFinderHelper.CurrentList = StyleClassList;
 			var applier = new StyleApplier();
-			Apply (ruleset, applier, styleClassList, View);
+			Apply (ruleset, applier, View);
 		}
 		
 		public override bool ShouldAutorotateToInterfaceOrientation (UIInterfaceOrientation toInterfaceOrientation)

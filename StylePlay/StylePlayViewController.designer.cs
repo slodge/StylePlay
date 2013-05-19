@@ -13,12 +13,20 @@ namespace StylePlay
 	{
 		[Outlet]
 		MonoTouch.UIKit.UILabel SpecialLabel { get; set; }
+
+		[Outlet]
+		MonoTouch.UIKit.UIButton SubButton { get; set; }
 		
 		void ReleaseDesignerOutlets ()
 		{
 			if (SpecialLabel != null) {
 				SpecialLabel.Dispose ();
 				SpecialLabel = null;
+			}
+
+			if (SubButton != null) {
+				SubButton.Dispose ();
+				SubButton = null;
 			}
 		}
 	}
